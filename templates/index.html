@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Price Predictor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Car Price Predictor</h1>
+        <p>Select the car details to get the estimated market price based on model, year, and condition.</p>
+
+        <div class="form-container">
+            <div class="form-group">
+                <label for="company">Car Company</label>
+                <select id="company" name="company" onchange="updateModels()">
+                    {% for company in companies %}
+                        <option value="{{ company }}" {% if company == 'Select Company' %}selected{% endif %}>{{ company }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="car_models">Car Model</label>
+                <select id="car_models" name="car_models">
+                    <option value="Select Model" selected>Select Model</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="year">Year of Purchase</label>
+                <input type="range" id="year" name="year" min="{{ years[-1] }}" max="{{ years[0] }}" value="{{ years[0] }}" oninput="this.nextElementSibling.value = this.value">
+                <output>{{ years[0] }}</output>
+            </div>
+
+            <div class="form-group">
+                <label for="fuel_type">Fuel Type</label>
+                <select id="fuel_type" name="fuel_type">
+                    {% for fuel in fuel_types %}
+                        <option value="{{ fuel }}">{{ fuel }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="kilo_driven">Kilometers Driven</label>
+                <input type="number" id="kilo_driven" name="kilo_driven" value="0" min="0">
+            </div>
+        </div>
+
+        <div class="result">
+            <h2>Estimated Car Price</h2>
+            <p class="price">₹0</p>
+            <button onclick="predictPrice()">Predict</button>
+            <button onclick="resetForm()">Reset</button>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2025 Car Price Predictor. All predictions are estimates only.</p>
+    </footer>
+
+    <script>
+        async function updateModels() {
+            const company = document.getElementById('company').value;
+            const modelDropdown = document.getElementById('car_models');
+
+            try {
+                const response = await fetch(`/get_models/${company}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch models');
+                }
+
+                const data = await response.json();
+                const models = data.models;
+
+                // Clear the current options
+                modelDropdown.innerHTML = '';
+
+                // Add new options
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    if (model === 'Select Model') {
+                        option.selected = true;
+                    }
+                    modelDropdown.appendChild(option);
+                });
+            } catch (error) {
+                alert('Error fetching models: ' + error.message);
+            }
+        }
+
+        async function predictPrice() {
+            const company = document.getElementById('company').value;
+            const carModel = document.getElementById('car_models').value;
+
+            if (company === 'Select Company') {
+                alert('Please select a valid car company.');
+                return;
+            }
+
+            if (carModel === 'Select Model') {
+                alert('Please select a valid car model.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('company', company);
+            formData.append('car_models', carModel);
+            formData.append('year', document.getElementById('year').value);
+            formData.append('fuel_type', document.getElementById('fuel_type').value);
+            formData.append('kilo_driven', document.getElementById('kilo_driven').value);
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Prediction failed');
+                }
+
+                const result = await response.text();
+                document.querySelector('.price').textContent = `₹${parseFloat(result).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('company').value = 'Select Company';
+            updateModels(); // This will reset the car models dropdown to "Select Model"
+            document.getElementById('year').value = '{{ years[0] }}';
+            document.getElementById('year').nextElementSibling.value = '{{ years[0] }}';
+            document.getElementById('fuel_type').value = '{{ fuel_types[0] }}';
+            document.getElementById('kilo_driven').value = '0';
+            document.querySelector('.price').textContent = '₹0';
+        }
+    </script>
+</body>
+</html>
